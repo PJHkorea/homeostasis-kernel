@@ -107,7 +107,7 @@ class HomeostasisHuggingFaceAdapter:
 
     def remove_kernel_patch(self):
         """
-        장착된 항상성 옹키패치를 안전하게 떼어내고 원래의 1세대 확률 추론 모드로 클린 원복합니다.
+        장착된 항상성 몽키패치를 안전하게 떼어내고 원래의 1세대 확률 추론 모드로 클린 원복합니다.
         """
         if self.hook_handle is not None:
             self.hook_handle.remove()
@@ -116,7 +116,7 @@ class HomeostasisHuggingFaceAdapter:
 
 
 
-# --- 오픈소스 모델용 옹키패치 인터록 도킹 실전형 정밀 프로파일링 검증 코드 ---
+# --- 오픈소스 모델용 몽키패치 인터록 도킹 실전형 정밀 프로파일링 검증 코드 ---
 if __name__ == "__main__":
     print("========================================================================")
     print("🧪 [TEST] hf_adapter 중첩 getattr 폭포수 스캔 및 0ns 인터록 왕복 주행 검증 시동")
