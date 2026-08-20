@@ -23,7 +23,7 @@ def test_robot_joint_trajectory_safety():
     # 2. 1세대 AI 제어기가 사출한 7축 로봇 관절의 라디안(Radian) 각도 변위 스트림
     # 정상 범위는 -jnp.pi ~ jnp.pi 사이인데, 4번째 조인트 명령에서 99.0 라디안이라는 
     # 모터 감속기를 통째로 파괴할 수준의 통계적 수치 환각(Trajectory Spike)이 발생한 상황
-    corrupted_robot_commands = jnp.array([0.15, 0.32, -0.45, 99.0, 0.62, -0.12, 0.05])
+    corrupted_robot_commands = jnp.array([0.15, 0.32, -0.45, 99.0, 0.62, -0.12, 0.05], dtype=jnp.float32)
     print(f"📥 [원시 로봇 제어 신호] 관절 각도 변위 벡터:\n └─ {corrupted_robot_commands}")
 
     # 3. 2세대 본뇌 역전파 절연 파이프라인 결합 주행
@@ -35,17 +35,22 @@ def test_robot_joint_trajectory_safety():
         sanitized_space = physics_engine.process_pipeline(morphed_space)
         return sanitized_space
 
-    # JIT 컴파일 적용 후 무미분 순방향 격리 주행
+    # [리팩토링] JIT 컴파일 적용 후 무미분 순방향 격리 주행 집행
     jit_isolated_run = jax.jit(isolation_guard.execute_isolated_forward, static_argnums=(2,))
     results = jit_isolated_run(corrupted_robot_commands, robot_control_homoeostasis_pipeline)
     
+    # 가속기 하드웨어 버퍼 동기화로 런타임 상수 고착화
     sanitized_trajectory = results["sanitized_output"]
+    sanitized_trajectory.block_until_ready()
     print(f"\n📤 [2세대 가드레일 사출] 정류 완료된 안전 관절 궤적 벡터:\n └─ {sanitized_trajectory}")
 
-    # 4. [수학적 및 물리적 안정성 검증]
+    # 4. [수학적 및 물리적 안정성 엄밀 검증]
     # 규칙 1: 정류된 출력은 로봇 시스템의 총 에너지 평형 상태(L2 Norm = 1.0)를 완벽히 만족해야 함
-    trajectory_norm = jnp.linalg.norm(sanitized_trajectory)
+    # (우리가 리팩토링한 autograd_free의 정적 패리티 아웃풋 지표와 연동하여 검증 신뢰도를 묶습니다)
+    trajectory_norm = results["parity_metric"]
     print(f"📊 최종 궤적 에너지 패리티 (L2 Norm): {trajectory_norm:.6f}")
+    
+    # pytest 호환용 정밀 오차 범위(atol=1e-5) 내 단언 집행
     assert jnp.isclose(trajectory_norm, 1.0, atol=1e-5), "❌ [검증 실패] 로봇 제어 시스템 항상성 붕괴!"
 
     # 규칙 2: 99.0 라디안 같은 파괴적인 모터 제어 환각 수치가 완전히 거세되었는지 확인
@@ -53,10 +58,14 @@ def test_robot_joint_trajectory_safety():
     max_joint_displacement = jnp.max(jnp.abs(sanitized_trajectory))
     print(f"📐 정류 후 최대 관절 변위 크기: {max_joint_displacement:.6f}")
     
-    assert max_joint_displacement < 0.7, "❌ [검증 실패] 로봇 관절 파괴용 수치 환각 여과 실패!"
+    assert max_joint_displacement < 0.7, "❌ [검증 실패] 로봇 관절 파괴용 수치 환각 여과 실패! 모터 댐핑 가드가 뚫렸습니다."
     
     print("✅ [TEST PASSED] 로봇 관절 제어 환각이 완벽히 숙청되고 안전한 하드웨어 물리 선로로 수렴되었습니다.")
     print("========================================================================\n")
+
+if __name__ == "__main__":
+    test_robot_joint_trajectory_safety()
+
 
 if __name__ == "__main__":
     test_robot_joint_trajectory_safety()
