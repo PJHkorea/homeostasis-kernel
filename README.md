@@ -1,3 +1,31 @@
+
+```directory
+homeostasis-kernel/
+│
+├── README.md               # 1세대 역전파의 시간적 환각 비판 및 2세대 철학 명세
+├── requirements.txt        # jax, jaxlib, torch, cupy 등 명시
+│
+├── kernel/                 # [본뇌] 2세대 항상성 가드레일 핵심 엔진 (JAX)
+│   ├── __init__.py
+│   ├── physics_filter.py   # 슈뢰딩거 노치 필터, 카시미르 노이즈 압착 수식
+│   ├── manifold.py         # 구면-토러스 위상 천이(Morphing) 및 왜도 평탄화
+│   └── autograd_free.py    # stop_gradient 기반 O(1) 메모리 동결 레이어
+│
+├── interface/              # [연결 관로] 하드웨어 레벨 무복사 인터페이스 (CUDA/Cupy)
+│   ├── __init__.py
+│   ├── dlpack_bridge.py    # PyTorch(LLM) ↔ JAX(Kernel) 간 0ns Zero-Copy 도킹
+│   └── silicon_mux.py      # CUDA 워프 셔플 기반 0ns 분기 소멸 옵티마이저
+│
+├── adapters/               # [보조뇌 하청] 1세대 상용 LLM 연동 및 프롬프트 인입 레이어
+│   ├── __init__.py
+│   ├── hf_adapter.py       # HuggingFace (Llama, Mistral) 출력 레이어 Hooking
+│   └── api_adapter.py      # OpenAI / Anthropic API 스트림 정류기
+│
+└── tests/                  # [검증] 캐드(CAD) 및 물리 시뮬레이션 벤치마크
+    ├── test_cad_boundary.py# 캐드 공차 누적오차 숙청 테스트
+    └── test_memory_o1.py    # 문맥 길이에 따른 VRAM O(1) 유지력 측정 검증
+```
+
 ```mermaid
 graph TD
     %% 외부 엔티티 정의
