@@ -42,7 +42,7 @@
                    ▼
 ┌────────────────────────────────────────────────────────┐
 │ ⏳ 2세대 인입 패치 (adapters/ / interface/)              │
-│  - 선형적 시간 축(dt) 동기화 및 입력 스트림 왜도 평탄화      │
+│  - 선형적 시간 축(dt) 동기화 및 입력 스트림 왜도 평탄화     │
 └───────────────────┬────────────────────────────────────┘
                     │ DLPack 무복사(Zero-Copy) 버스 (0ns)
                     ▼
@@ -83,8 +83,81 @@
    실시간 센서 스트림 및 CAD 공차 로그가 인입되면, 2세대 입력 어댑터가 이를 미세한 선형 시간 격자($dt$) 위로 부드럽게 정렬합니다.
 2. **0ns 하이재킹**  
    JAX 기반 본뇌와 PyTorch 기반 보조뇌가 `DLPack` 무복사 파이프라인으로 물리 포인터를 공유하여, 메모리 할당 지연 없이 0ns 만에 LLM 헤드로 데이터를 도킹시킵니다.
-3. **물리적 숙청**  
+3. **출력전 후처리**  
    LLM이 통계적으로 사출한 출력물을 본뇌의 슈뢰딩거 포텐셜 가드레일이 후처리를 완료한 후 현실에 최종 출력합니다.
+
+
+---
+
+## 📐 Sector 3. 수리물리학적 가드레일 수식 명세 (Mathematical Core)
+
+본뇌 커널(`kernel/`) 내부에서 순방향 전진(**Forward-Only**) 주행 시, 선형적 시간을 부여하고 수치 발산을 막는 4가지 수리물리학적 방정식 입니다.
+
+---
+
+### 1. 🔒 자동 미분 절연 및 정적 복잡도 방정식 (Gradient Isolation)
+1세대 AI의 문맥 길이에 따른 VRAM 폭발($O(N^2)$)을 막기 위해, 시간 축 방향의 사후적 오차 역전파 그래프 사슬을 강제로 절연합니다. 
+
+$$\mathbf{X}_{\text{isolated}} = \mathcal{SG}(\mathbf{X}_{\text{raw}})$$
+
+여기서 $\mathcal{SG}$는 `jax.lax.stop_gradient` 연산자로, 순방향 연산 결과값(Primal Value)은 그대로 보존하되 미분 연산자 기저를 완전 절단합니다. 이로 인해 메모리 그래프 공간 복잡도는 영원히 흐르는 시간 축 $t$와 무관하게 정적 상수를 유지합니다.
+
+$$\text{VRAM Space Complexity} \sim O(1)$$
+
+---
+
+### 2. 🌊 슈뢰딩거 에너지 장벽 노치 필터 (Schrödinger Potential Notch Filter)
+1세대 보조뇌가 뱉어내는 급격한 수치적 노이즈를 위상 기저 곡률 변화율로 감지하여, 양자 터널링 효과를 모방한 투과 계수로 격리 제거합니다.
+
+입력 스트림의 이계도 곡률 변위 $\kappa$를 다음과 같이 산출합니다:
+
+$$\kappa = \left| \nabla^2 \mathbf{X} \right| = \left| \frac{\partial^2 \mathbf{X}}{\partial x^2} \right|$$
+
+곡률 변위에 비례하는 유효 포텐셜 장벽 $U_{\text{barrier}}$와 양자 터널링 투과 계수(Transmission Coefficient) $T$를 연동합니다:
+
+$$U_{\text{barrier}} = \sigma \cdot \kappa$$
+
+$$T = \exp\left( -\frac{2\sqrt{2m \cdot U_{\text{barrier}}}}{\hbar_{\text{eff}}} \right)$$
+
+수치적 환각 성분일수록 곡률 $\kappa$가 폭발하여 장벽 $U$가 무한대로 솟구치며, 최종 신호 투과율 $T \rightarrow 0.0$으로 수렴되어 발산 신호가 제거됩니다.
+
+---
+
+### 🗜️ 3. 카시미르 위상학적 진공 압착 수식 (Casimir Noise Compression)
+캐드(CAD) 공차 미세 오차나 제어 신호 내부의 미립자 노이즈가 임계 바운더리 이하로 좁혀질 때, 공간의 위상학적 경계면 붕괴를 막기 위해 우주의 진공 음압 현상을 모방하여 제로($0.0$)로 압착합니다.
+
+정규화된 공간 거리 $d$에 따른 카시미르 인력 변위 압착 함수 $P_{\text{casimir}}$는 다음과 같습니다:
+
+$$d = |\mathbf{X}| + \epsilon \quad (\epsilon = 10^{-6})$$
+
+$$P_{\text{casimir}} = \frac{\pi^2 \hbar c}{240 \cdot d^4}$$
+
+누적 오차가 허용 공차 임계값 $\delta$를 건드리는 수치적 싱큘래리티(Singularity) 영역 진입 징후 포착 시, 실리콘 마스크 인터록 회로가 가동되어 오차 성분을 압착시킵니다.
+
+
+
+```math
+X_{\text{compressed}} = \begin{cases} 0.0 & \text{if } P_{\text{casimir}} > \frac{1}{\delta^4} \\ X & \text{otherwise} \end{cases} 
+```
+
+---
+
+### 🗺️ 4. 3차 모멘트 왜도 평탄화 격자 차분 (3rd Moment Skewness Flattening)
+데이터가 특정 방향으로 치우쳐 찌그러지면서 발생하는 수치 다양체(Manifold)의 찢어짐 현상을 방지하기 위해, 통계적 3차 모멘트(왜도) 성분을 공간 곡률 댐핑 브레이크로 역치환하여 격자를 평탄화(Flattening)합니다.
+
+스트림의 평균 $\mu$와 표준편차 $\sigma_s$를 기준으로 한 왜도 벡터 $\mathcal{S}$는 다음과 같습니다:
+
+$$\mathcal{S} = \mathbb{E}\left[ \left( \frac{\mathbf{X} - \mu}{\sigma_s} \right)^3 \right]$$
+
+왜도 왜곡이 심한 영역에 기하학적 점성 브레이크 계수 $\alpha$를 결합하여 공간 위상을 정류합니다:
+
+$$\mathbf{X}_{\text{flattened}} = \mathbf{X} - (\alpha \cdot \mathcal{S})$$
+
+최종적으로 공간의 무질서도 왜곡도가 완전히 정류된 상태에서 다양체의 기하학적 위상 결맞음을 보존하기 위해 **L2 Norm Parity** 항상성을 강제 집행하며 연산을 마감합니다:
+```math
+\mathbf{X}_{\text{final}} = \frac{\mathbf{X}_{\text{flattened}}}{\Vert{}\mathbf{X}_{\text{flattened}}\Vert{}_2 + \epsilon}
+```
+
 
 
 ```directory
