@@ -69,7 +69,7 @@ def compile_asynchronous_overlapping_pipeline(devices_mesh: jax.sharding.Mesh, m
         
         return jax.lax.stop_gradient(stabilized_stream)
 
-    # --------------------------------------------------------------------------
+       # --------------------------------------------------------------------------
     # 🗂️ STEP 2: [★FINAL EVOLUTION★] Static 4D Tensor Manifold Shard-Map Binding
     # --------------------------------------------------------------------------
     # [★CRITICAL CALIBRATION★] 차원 명세 부호를 Llama SDPA(Scaled Dot-Product Attention) 및 플래시 어텐션 
@@ -87,7 +87,7 @@ def compile_asynchronous_overlapping_pipeline(devices_mesh: jax.sharding.Mesh, m
     )
     
     # 가속기 내부 호스트 단의 호스트-디바이스(H2D) 추상화 누수를 완벽 밀봉 록킹 처리하여 리턴
-    return jated_object = orchestrated_shard_map
+    return orchestrated_shard_map
 
 # 전역 분산 통신 동시성 제어 팩토리 링커 불변성 시스템 락킹
 __all__ = ["compile_asynchronous_overlapping_pipeline"]
