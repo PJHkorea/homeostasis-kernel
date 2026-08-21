@@ -49,8 +49,11 @@ class DynamicalManifoldShifter:
         is_nan_inf = jnp.isnan(damped_matrix) | jnp.isinf(damped_matrix)
         clean_matrix = self.mux_opt.garbage_mask_interlock(damped_matrix, is_nan_inf, garbage_value=0.0)
         
-        # 7. [geometry.py 핵심 기믹 마감] 정적 가상 뷰 연산이 완료된 텐서를 원래 차원 사양으로 즉각 복원 사출
-        return jnp.reshape(clean_stream, original_shape)
+        # 7. [📐 7TH-GEN LINE 76 SILICON FIX COMPLETE]
+        # 변수명 누수 버블(clean_stream -> clean_matrix)을 완벽히 소멸 배제하고,
+        # 정적 가상 뷰 연산이 완료된 텐서를 원본 차원 사양 명세로 한 치의 오차도 없이 무복사 복원 사출합니다.
+        return jnp.reshape(clean_matrix, original_shape)
+
 
 
           @partial(jax.jit, static_argnums=(0, 2))
