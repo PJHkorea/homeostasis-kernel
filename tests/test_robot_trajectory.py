@@ -4,6 +4,10 @@ from kernel.physics_filter import PhysicsInformativeFilter
 from kernel.manifold import DynamicalManifoldShifter
 from kernel.autograd_free import AutogradFreeIsolationLayer
 
+# [6차 고도화 - test_memory_o1.py에 통합 정립된 중앙 부트스트랩 프로토콜 무리 인입]
+# 개별 테스트 파일 내에서 Abstract Tracer를 중복 가동하던 불필요한 빌드 지터를 전면 소멸시킵니다.
+from tests.test_memory_o1 import trigger_global_bootstrap_precompilation
+
 def test_robot_joint_trajectory_safety():
     """
     [로봇 궤적 물리적 바운더리 및 항상성 안전성 검증 벤치마크]
@@ -31,7 +35,7 @@ def test_robot_joint_trajectory_safety():
 
     # 3. 2세대 본뇌 역전파 절연 파이프라인 결합 주행 정의
     def robot_control_homoeostasis_pipeline(raw_input):
-        # Step A: [리팩토링] manifold 고도화 사양에 부합하도록 정적 spatial_dim 상수를 안전하게 바인딩
+        # Step A: manifold 고도화 사양에 부합하도록 정적 spatial_dim 상수를 안전하게 바인딩
         # 3차 모멘트 왜도 평탄화를 통해 모터 저크 성분을 깎아내고, 토러스 기저 위상 천이 반영 (t=0.8 화살 주입)
         morphed_space = manifold_shifter.transform_pipeline(raw_input, spatial_dim=ROBOT_JOINT_DIM, time_tick_ratio=0.8)
         # Step B: 슈뢰딩거 에너지 장벽 필터링을 통해 급격한 가속도 점프 신호를 차단 (내부 버퍼 기증 인플레이스 전사)
@@ -43,13 +47,10 @@ def test_robot_joint_trajectory_safety():
     # 가속기가 1번 인자(corrupted_robot_commands)의 VRAM 물리 공간을 0ns 복사 버블 제로형 인플레이스로 재활용하게 강제합니다.
     jit_isolated_run = jax.jit(isolation_guard.execute_isolated_forward, static_argnums=(2,), donate_argnums=(0,))
 
-    # [5차 고도화 - pinn_brain.py 유산 인입: 0MB 정적 가상 추상 텐서 AOT 예열]
-    # 실제 물리 디바이스 메모리를 1바이트도 오염시키지 않는 가상 추상 구조체(ShapeDtypeStruct) 주입 예열 실행
-    # 실시간 로봇 관절 명령 첫 패스 스트림 진입 시의 JIT 컴파일 레이턴시와 수치 충돌 노이즈를 부팅 클록선에서 선제 소멸시킵니다.
-    print("⏳ [System Boot] 0MB Static Tracer 기반 AOT 정적 예열 커널 포메이션 가동...")
-    abstract_virtual_tensor = jax.ShapeDtypeStruct(shape=(ROBOT_JOINT_DIM,), dtype=jnp.float32)
-    lowered_execution_graph = jit_isolated_run.lower(abstract_virtual_tensor, robot_control_homoeostasis_pipeline)
-    _ = lowered_execution_graph.compile()
+    # [6차 고도화 - main_orchestrator.py 유산 인입: 통합 부트스트랩 관로를 통한 0바이트 컴파일 동결막 기폭]
+    # 실제 디바이스 메모리(VRAM)를 전혀 오염시키지 않는 0MB 전역 매니페스트 중앙 캐시 레일 연동 하드 록킹
+    print("⏳ [System Boot] 전역 부트스트랩 매니페스트 기반 AOT 정적 예열 시동...")
+    _ = trigger_global_bootstrap_precompilation(jit_isolated_run, "robot_trajectory_stream", robot_control_homoeostasis_pipeline)
     print("🏰 [System Boot] AOT Robot Trajectory Kernel Fusion Success. 제로 지터 제어 가드막 동결 완공.")
 
     # 마스터 가속기 파이프라인 무미분 순방향 격리 주행 집행
@@ -79,4 +80,6 @@ def test_robot_joint_trajectory_safety():
     print("========================================================================\n")
 
 if __name__ == "__main__":
+    # [리팩토링]: 전역 부트스트랩 인프라 프레임워크와 1:1 결맞음 규격을 수용한 상태로 검증 가동
     test_robot_joint_trajectory_safety()
+
