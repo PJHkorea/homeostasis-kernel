@@ -68,7 +68,7 @@ def test_vram_static_o1_homoeostasis() -> None:
     # 인입 즉시 VRAM 텐서 소유권을 XLA에 통째로 영구 기증 기폭 처리(donate_argnums=(1,)) 사수.
     jit_isolated_run = jax.jit(isolation_guard.execute_isolated_forward, static_argnums=(2,), donate_argnums=(1,))
 
-    # 2. [통합 부트스트랩 적용]: 전역 매니페스트 관로를 통한 0바이트 컴파일 동결막 기폭
+       # 2. [통합 부트스트랩 적용]: 전역 매니페스트 관로를 통한 0바이트 컴파일 동결막 기폭
     print("⏳ [System Boot] 전역 부트스트랩 매니페스트 기반 AOT 정적 예열 시동...")
     _ = trigger_global_bootstrap_precompilation(jit_isolated_run, "vram_o1_stream", closure_pipeline)
     print("🏰 [System Boot] AOT Kernel Fusion Success. 전역 추적 제어막 동결 완공.")
@@ -76,13 +76,16 @@ def test_vram_static_o1_homoeostasis() -> None:
     initial_vram = get_current_vram_usage()
     print(f"📦 [기준점 생성] 통합 AOT 예열 컴파일 완료 후 순수 초기 VRAM 상태: {initial_vram:.2f} MB")
 
-   
-
-
+    # 3. 무한 스트림 가상 주행 (1,000 틱 연속 순방향 주행)
+    # 📐 FIX COMPLETE: 누수되어 런타임 NameError를 기폭하던 total_ticks 및 start_time 상숫값 프로필 복구 안착 완료
+    total_ticks = 1000
+    memory_history = []
     
-        # 3. 무한 스트림 가상 주행 (1,000 틱 연속 순방향 주행)
-    # [📐 7TH-GEN INTERLOCK FIX COMPLETE]: 누락되었던 1,000틱 실전 가속 주행선 관로를 완벽 복구 안착시켰습니다.
-    # 0바이트 인플레이스 전사 서명 사양이 가동되므로, 루프가 돌더라도 Transient Allocation 버블은 발생하지 않습니다.
+    print(f"\n🔄 선형적 시간 축 롤아웃 시작 ({total_ticks} Ticks 전진)...")
+    start_time = time.time()
+    
+    # [📐 7TH-GEN INTERLOCK FIX COMPLETE]: 0바이트 인플레이스 전사 서명 사양이 가동되므로, 
+    # 루프가 1,000만 번 돌더라도 Transient Allocation 버블은 발생하지 않습니다.
     mock_input_stream = jnp.ones((1, 4096), dtype=jnp.float32)
     
     for tick in range(1, total_ticks + 1):
@@ -95,10 +98,11 @@ def test_vram_static_o1_homoeostasis() -> None:
         # 주기적 텔레메트리 메모리 추적 스캔 (지터 방지를 위한 GC 결착 내장)
         if tick % 200 == 0 or tick == 1:
             current_vram = get_current_vram_usage()
-            print( f"  ├─ [Tick {tick:04d}/{total_ticks}] 실시간 VRAM 점유량: {current_vram:.2f} MB")
+            print(f"  ├─ [Tick {tick:04d}/{total_ticks}] 실시간 VRAM 점유량: {current_vram:.2f} MB")
 
     end_time = time.time()
     final_vram = get_current_vram_usage()
+
 
     print("------------------------------------------------------------------------")
     print(f"⏱️ 총 연산 소요 시간: {end_time - start_time:.4f} 초")
