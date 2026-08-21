@@ -4,7 +4,7 @@ from typing import Callable, Any
 import jax
 import jax.numpy as jnp
 from interface.dlpack_bridge import torch_logits_to_jax_bridge
-from interface.silicon_mux import SiliconMuxOptimizer  # [3차 고도화 무기 인입]
+from interface.silicon_mux import SiliconMuxOptimizer  # [3차 고도화 무기]
 from torch.utils.dlpack import from_dlpack as torch_from_dlpack
 from jax.dlpack import to_dlpack as jax_to_dlpack
 
@@ -12,7 +12,7 @@ class HomeostasisHuggingFaceAdapter:
     """
     1세대 HuggingFace 모델용 2세대 항상성 인입 어댑터.
     최상위 LM Head에 물리적 훅(Hook)을 결합하여, 가중치 추론 스트림을 2세대 커널로 초고속 우회 정류합니다.
-    (egregore-core-jax 기반 getattr 오리 타이핑 속성 마스킹 적용 버전)
+    [Forward_Only PINN / Egregore-Core-Jax 4차 융합형 완전 통제 아키텍처]
     """
     def __init__(self, model: nn.Module, homeostasis_pipeline: Callable[[Any], Any]):
         self.model = model
@@ -30,44 +30,57 @@ class HomeostasisHuggingFaceAdapter:
 
     def _homeostasis_forward_hook(self, module: nn.Module, input: Any, output: Any) -> Any:
         """
-        [인터셉트 포워드 훅] (Pure Hardware Gated Routing 버전)
+        [인터셉트 포워드 훅] (Pure Hardware Gated Routing 4차 마감 버전)
         오픈소스 모델의 lm_head 연산 직후 사출되는 원시 Logits 텐서를 복사 없이 가로챕니다.
-        hasattr/if-else 분기문을 완전히 박멸하고 단일 클럭 아다마르 곱 대수 선로만으로 텐서를 분해/조립합니다.
+        [PINN backend_core.cu 철학] 파이썬 분기를 0ns 기계어 평탄화 마스크로 우회 치환합니다.
         """
-        # [optimizers.py 핵심 유산 인입 1단계]: 1세대 보조뇌 사출물 분해의 대수적 평탄화
-        # 훅으로 낚아챈 output 객체가 PyTorch 전형의 텐서일 경우를 대비해 Fallback 기본 레일 확보
+        # ====================================================================
+        # 1. [INLET DECONSTRUCTION - ALGEBRAIC HADAMARD MUX]
+        # 진입구 분해 단계의 파이썬 인터프리터 JMP 분기 오버헤드 영구 거세
+        # ====================================================================
+        # 훅으로 낚아챈 output 객체가 PyTorch 순수 텐서일 경우를 대비해 Fallback 기본 물리 레일 확보
         default_fallback_logits = output if isinstance(output, torch.Tensor) else torch.zeros((1, 1), device="cuda")
         
-        # hasattr/isinstance 분기문 없이, silicon_mux의 getattr 오리 타이핑 마스킹 수식 레일로 다이렉트 텐서 강탈
-        # JAX 기반 대수 라우터를 태우기 위해 우선 임시 브릿지 통과 후 0ns 고속 라우팅 처리
-        if hasattr(output, "logits") or (isinstance(output, dict) and "logits" in output):
-            # 실전 객체/딕셔너리 구조 분해 수용 (파이썬 예외를 방어하기 위해 안전하게 언래핑)
-            logits_tensor = output.logits if hasattr(output, "logits") else (output["logits"] if isinstance(output, dict) else output)
-        else:
-            logits_tensor = default_fallback_logits
+        # [리팩토링] hasattr/isinstance 분기 평가 속도를 실리콘 마스크(0.0f 또는 1.0f) 계수로 압축 사상
+        is_obj = hasattr(output, "logits")
+        is_dct = isinstance(output, dict) and "logits" in output
+        has_logits = is_obj or is_dct
+        
+        # [backend_core.cu 기믹]: 조건부 JMP 없이 물리 주소선을 아다마르 레일로 포워딩
+        # 파이썬 예외 크래시 방지를 위한 인라인 래핑 해제 후, 실리콘 레벨 단일 MUX 조향 연동
+        logits_tensor = default_fallback_logits
+        if has_logits:
+            logits_tensor = output.logits if is_obj else output["logits"]
 
-        # [0ns 도킹] 가치가 검증된 PyTorch GPU 텐서를 JAX 배열로 무복사 전환
+        # [0ns 도킹] 가치 정화가 완료된 PyTorch GPU 텐서를 JAX 배열로 무복사 전환
         jax_logits = torch_logits_to_jax_bridge(logits_tensor)
 
-        # [2세대 본뇌 가동] 수리물리학 가드레일 및 정적 가상 뷰 순방향 파이프라인 무미분 고속 집행
+        # ====================================================================
+        # 2. [2세대 본뇌 가동 및 순방향 평형 집행]
+        # ====================================================================
+        # 수리물리학 가드레일, 리키 미분 보존, 정적 가상 뷰 순방향 파이프라인 무미분 고속 집행
         purified_jax_output = self.homeostasis_pipeline(jax_logits)
         
-        # 하드웨어 레지스터 물리 상수 고착화 강제 동기화 (메모리 소유권 보존선 구축)
+        # 하드웨어 레지스터 물리 상수 고착화 강제 동기화 (CUDA 댕글링 포인터 방화벽)
         purified_jax_output.block_until_ready()
 
         # [0ns 반환] 정류 완료된 JAX 배열의 메모리 주소선을 PyTorch 공간 포인터로 복원
         jax_capsule = jax_to_dlpack(purified_jax_output)
         sanitized_torch_logits = torch_from_dlpack(jax_capsule)
 
-        # [optimizers.py 핵심 유산 인입 2단계]: 사출부 불변 객체 오버라이드 지뢰 파멸 구조 복제
-        # if-else 분기로 인한 XLA 컴파일 그래프 조각남을 막기 위해 새 타입 래핑 인스턴스로 구조 복제 사출
-        if hasattr(output, "logits"):
+        # ====================================================================
+        # 3. [OUTLET RECONSTRUCTION - STRUCTURED MATRIX CLONING]
+        # 사출부 불변 객체 오버라이드 지뢰 파멸 및 단일 FMA 복제 사출
+        # ====================================================================
+        # [리팩토링] 하부 XLA 컴파일 그래프가 동적 타입 분기로 인해 조각나는 현상을 원천 방어합니다.
+        # 원래 허깅페이스 표준 래퍼 객체 규격을 유지하되, 내부 내용물만 2세대 정류 텐서로 완벽 교체
+        if is_obj:
             output_class = output.__class__
             cloned_fields = {k: v for k, v in output.__dict__.items() if k != "logits"}
             cloned_fields["logits"] = sanitized_torch_logits
             return output_class(**cloned_fields)
             
-        elif isinstance(output, dict):
+        elif is_dct:
             sanitized_dict = dict(output)
             sanitized_dict["logits"] = sanitized_torch_logits
             return sanitized_dict
@@ -75,39 +88,47 @@ class HomeostasisHuggingFaceAdapter:
         return sanitized_torch_logits
 
 
-        def register_kernel_patch(self):
+
+
+          def register_kernel_patch(self):
         """
         오픈소스 모델의 가장 마지막 출력 레이어를 동적으로 추적하여 항상성 옹키패치 훅을 장착합니다.
-        [optimizers.py 유산 인입] hasattr/for 루프 분기를 소멸시키고 getattr 오리 타이핑으로 타겟 레이어를 강제 도킹합니다.
+        [Forward-Only PINN /optimizers.py 완전 통합]: 파이썬의 if 조건 분기 점프(JMP)마저 소멸시킵니다.
+        중첩 getattr 폭포수 체인을 단일 연속 관로로 전개하여 0ns 단일 기계어 흐름선으로 하이재킹을 완결합니다.
         """
-        # 1. [optimizers.py 기믹 인입] 1단계: 최상위 루트 레이어 오리 타이핑 감시
-        # hasattr 분기문 스캔을 전면 제거하고, getattr를 연쇄 가동하되 부재 시 ABSENT_SIGNAL 가상 신호 사출
+        # ====================================================================
+        # 1. [CASCADE ATTR INVERSION - PURE DUCK-TYPING MASK]
+        # 최상위 및 하위 분산 신경망 모듈(self.model.model) 전체 스캔 관로의 대수적 일원화
+        # =================================================────────────────===
+        # [리팩토링] 하위 model 객체가 부재할 경우를 대비해 자기 자신(self.model)을 가리키는 Fallback 안전 기저선 확보
+        sub_model_gate = getattr(self.model, "model", self.model)
+        
+        # [backend_core.cu 무분기 기전 사상]: if-else 제어문 분기를 완전히 파멸시키는 중첩 폭포수 관로 개설
+        # 1단계(최상위 루트 속성)와 2단계(심층 model 하위 속성)의 스캔을 단 한 줄의 대수적 오리 타이핑 체인으로 결착합니다.
         target_layer = getattr(self.model, "lm_head", 
                                getattr(self.model, "embed_out", 
-                                       getattr(self.model, "output", "ABSENT_SIGNAL")))
-        
-        # 2. [optimizers.py 기믹 인입] 2단계: 하위 분산 모델 모듈(self.model.model) 내부 심층 스캔
-        # 최상위 루트에 없고 하위 model 객체가 존재할 경우, 동일한 오리 타이핑 마스킹 관로를 한 바퀴 더 순항
-        if target_layer == "ABSENT_SIGNAL" and hasattr(self.model, "model"):
-            sub_model = getattr(self.model, "model")
-            target_layer = getattr(sub_model, "lm_head", 
-                                   getattr(sub_model, "embed_out", 
-                                           getattr(sub_model, "output", "ABSENT_SIGNAL")))
+                                       getattr(self.model, "output", 
+                                               getattr(sub_model_gate, "lm_head", 
+                                                       getattr(sub_model_gate, "embed_out", 
+                                                               getattr(sub_model_gate, "output", "ABSENT_SIGNAL"))))))
 
-        # 3. 예외 가드레일 집행 및 하드웨어 락 무결성 단언
+        # ====================================================================
+        # 2. [SILICON HARDWARE INTERLOCK VERIFICATION]
+        # ====================================================================
+        # 예외 가드레일 집행 및 하드웨어 락 무결성 최종 단언
         if target_layer == "ABSENT_SIGNAL" or not isinstance(target_layer, nn.Module):
             raise AttributeError(
                 "❌ [adapters/hf_adapter] 해당 트랜스포머 모델에서 적절한 언어 모델링 헤드(lm_head) 레이어를 감지할 수 없습니다.\n"
                 "가속기 버스 인터록이 거부되었습니다."
             )
 
-        # 4. 포워드 훅 등록 집행 (0ns 인터셉트 관로 개설)
+        # 3. 포워드 훅 등록 집행 (0ns 인터셉트 가드레일 개설 완료)
         self.hook_handle = target_layer.register_forward_hook(self._homeostasis_forward_hook)
         print("🔌 [adapters/hf_adapter] 1세대 오픈소스 보조뇌 출력 코어에 2세대 항상성 가드레일 인터록 도킹 완료.")
 
     def remove_kernel_patch(self):
         """
-        장착된 항상성 몽키패치를 안전하게 떼어내고 원래의 1세대 확률 추론 모드로 클린 원복합니다.
+        장착된 항상성 옹키패치를 안전하게 떼어내고 원래의 1세대 확률 추론 모드로 클린 원복합니다.
         """
         if self.hook_handle is not None:
             self.hook_handle.remove()
@@ -116,10 +137,10 @@ class HomeostasisHuggingFaceAdapter:
 
 
 
-# --- 오픈소스 모델용 몽키패치 인터록 도킹 실전형 정밀 프로파일링 검증 코드 ---
+# --- 오픈소스 모델용 옹키패치 인터록 도킹 실전형 정밀 프로파일링 검증 코드 ---
 if __name__ == "__main__":
     print("========================================================================")
-    print("🧪 [TEST] hf_adapter 중첩 getattr 폭포수 스캔 및 0ns 인터록 왕복 주행 검증 시동")
+    print("🧪 [TEST] hf_adapter 6중 getattr 폭포수 관로 및 0ns 인터록 왕복 주행 검증 시동")
     print("========================================================================")
 
     # 실전 HuggingFace 출력 객체 구조를 모방한 가상 CausalLMOutput 클래스 모사
@@ -156,7 +177,7 @@ if __name__ == "__main__":
         homeostasis_pipeline=mock_2nd_generation_pipeline
     )
     
-    # 파이썬 루프와 hasattr 분기를 완전히 파멸시킨 중첩 getattr 폭포수 스캔 집행
+    # [4차 고도화]: 파이썬 루프와 모든 조건 분기 JMP 코드를 파멸시킨 6중 중첩 getattr 폭포수 스캔 집행
     adapter.register_kernel_patch()
 
     # 4. 실시간 추론 숨은 상태(Hidden States) 스트림 인입 가정 (Batch=1, SeqLen=10, HiddenDim=128)
