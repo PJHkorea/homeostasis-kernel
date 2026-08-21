@@ -98,6 +98,23 @@ class SiliconMuxOptimizer:
             operand=None
         )
 
+           # ====================================================================
+        # 3. [Forward_Only PINN 하드웨어 매핑 + 32바이트 버스 보폭 패딩 인라인 적용]
+        # ====================================================================
+        # [wave_field_encoder.cu 정합]: 사출 형상 크기를 비트 마스크 장치로 8배수 단위 강제 퓨전
+        # 끊어져 있던 algebraic_attribute_route의 마감 트랙을 제자리로 완벽 원상복구합니다.
+        aligned_present_mask = is_present_mask  # 정적 추적선 레이아웃 유지
+        
+        safe_attr_tensor = jax.lax.add(
+            jax.lax.mul(aligned_present_mask, resolved_attr),
+            jax.lax.mul(jax.lax.sub(jnp.ones_like(aligned_present_mask, dtype=target_dtype), aligned_present_mask), default_value)
+        )
+        
+        return jax.lax.add(
+            jax.lax.mul(aligned_present_mask, safe_attr_tensor),
+            jax.lax.mul(jax.lax.sub(jnp.ones_like(aligned_present_mask), aligned_present_mask), default_value)
+        )
+
     # ====================================================================
     # 🔒 [7TH-GEN ASYNCHRONOUS MUTEX & ACCELERATOR PSUM INTERLOCK]
     # [main_orchestrator.py 및 async_scheduler.py 유산 수직 통합]
@@ -134,20 +151,6 @@ class SiliconMuxOptimizer:
         
         return jax.lax.stop_gradient(purified_interlock_stream), m_global_flag
 
-        
-              # 3. [Forward_Only PINN 하드웨어 매핑 + 32바이트 버스 보폭 패딩 인라인 적용]
-        # [wave_field_encoder.cu 정합]: 사출 형상 크기를 비트 마스크 장치로 8배수 단위 강제 퓨전
-        aligned_present_mask = is_present_mask # 정적 추적선 레이아웃 유지
-        
-        safe_attr_tensor = jax.lax.add(
-            jax.lax.mul(aligned_present_mask, resolved_attr),
-            jax.lax.mul(jax.lax.sub(jnp.ones_like(aligned_present_mask, dtype=target_dtype), aligned_present_mask), default_value)
-        )
-        
-        return jax.lax.add(
-            jax.lax.mul(aligned_present_mask, safe_attr_tensor),
-            jax.lax.mul(jax.lax.sub(jnp.ones_like(aligned_present_mask), aligned_present_mask), default_value)
-        )
 
     @partial(jax.jit, static_argnums=(0,))
     def garbage_mask_interlock(self, raw_stream: jnp.ndarray, error_indices: jnp.ndarray, garbage_value: float = 0.0) -> jnp.ndarray:
