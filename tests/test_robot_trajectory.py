@@ -26,17 +26,33 @@ def test_robot_joint_trajectory_safety():
     corrupted_robot_commands = jnp.array([0.15, 0.32, -0.45, 99.0, 0.62, -0.12, 0.05], dtype=jnp.float32)
     print(f"📥 [원시 로봇 제어 신호] 관절 각도 변위 벡터:\n └─ {corrupted_robot_commands}")
 
-    # 3. 2세대 본뇌 역전파 절연 파이프라인 결합 주행
+    # 고유 7축 하드웨어 관절 공간 기저 차원 변수 설정
+    ROBOT_JOINT_DIM = 7
+
+    # 3. 2세대 본뇌 역전파 절연 파이프라인 결합 주행 정의
     def robot_control_homoeostasis_pipeline(raw_input):
-        # Step A: 3차 모멘트 왜도 평탄화를 통해 모터 저크 성분을 깎아내고, 
-        # 조인트의 가동 범위가 주기적으로 순환하도록 토러스(Toroidal) 기저 위상 천이 반영
-        morphed_space = manifold_shifter.transform_pipeline(raw_input, time_tick_ratio=0.8)
-        # Step B: 슈뢰딩거 에너지 장벽 필터링을 통해 급격한 가속도 점프 신호를 차단
+        # Step A: [리팩토링] manifold 고도화 사양에 부합하도록 정적 spatial_dim 상수를 안전하게 바인딩
+        # 3차 모멘트 왜도 평탄화를 통해 모터 저크 성분을 깎아내고, 토러스 기저 위상 천이 반영 (t=0.8 화살 주입)
+        morphed_space = manifold_shifter.transform_pipeline(raw_input, spatial_dim=ROBOT_JOINT_DIM, time_tick_ratio=0.8)
+        # Step B: 슈뢰딩거 에너지 장벽 필터링을 통해 급격한 가속도 점프 신호를 차단 (내부 버퍼 기증 인플레이스 전사)
         sanitized_space = physics_engine.process_pipeline(morphed_space)
         return sanitized_space
 
-    # [리팩토링] JIT 컴파일 적용 후 무미분 순방향 격리 주행 집행
-    jit_isolated_run = jax.jit(isolation_guard.execute_isolated_forward, static_argnums=(2,))
+    # [리팩토링 - PINN 소버린 버퍼 기증 최외곽 컴파일 결착]
+    # 최외곽 JIT 컴파일러 지시어 레벨에 donate_argnums=(0,) 자원 기증 선로를 명확히 고착 락킹하여
+    # 가속기가 1번 인자(corrupted_robot_commands)의 VRAM 물리 공간을 0ns 복사 버블 제로형 인플레이스로 재활용하게 강제합니다.
+    jit_isolated_run = jax.jit(isolation_guard.execute_isolated_forward, static_argnums=(2,), donate_argnums=(0,))
+
+    # [5차 고도화 - pinn_brain.py 유산 인입: 0MB 정적 가상 추상 텐서 AOT 예열]
+    # 실제 물리 디바이스 메모리를 1바이트도 오염시키지 않는 가상 추상 구조체(ShapeDtypeStruct) 주입 예열 실행
+    # 실시간 로봇 관절 명령 첫 패스 스트림 진입 시의 JIT 컴파일 레이턴시와 수치 충돌 노이즈를 부팅 클록선에서 선제 소멸시킵니다.
+    print("⏳ [System Boot] 0MB Static Tracer 기반 AOT 정적 예열 커널 포메이션 가동...")
+    abstract_virtual_tensor = jax.ShapeDtypeStruct(shape=(ROBOT_JOINT_DIM,), dtype=jnp.float32)
+    lowered_execution_graph = jit_isolated_run.lower(abstract_virtual_tensor, robot_control_homoeostasis_pipeline)
+    _ = lowered_execution_graph.compile()
+    print("🏰 [System Boot] AOT Robot Trajectory Kernel Fusion Success. 제로 지터 제어 가드막 동결 완공.")
+
+    # 마스터 가속기 파이프라인 무미분 순방향 격리 주행 집행
     results = jit_isolated_run(corrupted_robot_commands, robot_control_homoeostasis_pipeline)
     
     # 가속기 하드웨어 버퍼 동기화로 런타임 상수 고착화
@@ -46,7 +62,6 @@ def test_robot_joint_trajectory_safety():
 
     # 4. [수학적 및 물리적 안정성 엄밀 검증]
     # 규칙 1: 정류된 출력은 로봇 시스템의 총 에너지 평형 상태(L2 Norm = 1.0)를 완벽히 만족해야 함
-    # (우리가 리팩토링한 autograd_free의 정적 패리티 아웃풋 지표와 연동하여 검증 신뢰도를 묶습니다)
     trajectory_norm = results["parity_metric"]
     print(f"📊 최종 궤적 에너지 패리티 (L2 Norm): {trajectory_norm:.6f}")
     
@@ -62,10 +77,6 @@ def test_robot_joint_trajectory_safety():
     
     print("✅ [TEST PASSED] 로봇 관절 제어 환각이 완벽히 숙청되고 안전한 하드웨어 물리 선로로 수렴되었습니다.")
     print("========================================================================\n")
-
-if __name__ == "__main__":
-    test_robot_joint_trajectory_safety()
-
 
 if __name__ == "__main__":
     test_robot_joint_trajectory_safety()
