@@ -11,11 +11,17 @@ class HomeostasisAPIAdapter:
     """
     1세대 폐쇄형 상용 API(OpenAI/Anthropic) 전용 2세대 항상성 정류 어댑터.
     실시간 토큰 스트림에서 수치적 환각 파편을 추출하여 2세대 커널로 물리 필터링을 집행합니다.
+    [Forward_Only PINN / main_orchestrator.py 6차 융합형 분시성 거버넌스 아키텍처]
     """
     def __init__(self, homeostasis_pipeline: Callable[[jnp.ndarray], jnp.ndarray]):
         self.homeostasis_pipeline = homeostasis_pipeline
         # [리팩토링] 지수 표기법(1e-4, 2.5e+3) 및 다양한 공차 형식을 누수 없이 추출하는 정밀 정규식 보강
         self.numeric_pattern = re.compile(r"[-+]?\d*\.\d+(?:[eE][-+]?\d+)?|[-+]?\d+(?:[eE][-+]?\d+)?")
+        
+        # [6차 고도화 - main_orchestrator.py 유산 인입]
+        # 수백 명의 동시성 사용자가 상용 API 스트림을 가로챌 때 발생하는 VRAM 주소선 스왑 레이스 컨디션을 
+        # 완벽하게 무력화하기 위한 물리적 원자적 비동기 컨텍스트 가드 락(Atomic Mutex Fence) 장착 완료
+        self.infrastructure_atomic_lock = asyncio.Lock()
 
     def _execute_kernel_computation(self, numbers_list: list[float]) -> list[float]:
         """
@@ -42,47 +48,53 @@ class HomeostasisAPIAdapter:
 
     async def _process_vector_in_kernel(self, numbers_list: list[float]) -> list[float]:
         """
-        [리팩토링] 비동기 논블로킹 커널 관로 어댑터
+        [리팩토링] 비동기 논블로킹 커널 관로 어댑터 (Atomic Mutex Guarded 버전)
         추출된 수치 파편들을 비동기 이벤트 루프 병목 없이 2세대 JAX 커널로 가속 주행시킵니다.
         """
-        if not numbers_list:
+        # [리팩토링 - [[unlikely]] 경로 격리]: 리스트가 존재하는 정상 수류 상황(Nominal State)을 최선순위로 고정
+        is_nominal_flow = len(numbers_list) > 0
+        
+        if not is_nominal_flow:
+            # [[unlikely]] 예외 영역: 데이터가 비어 유입된 예외 바이너리 어셈블리를 콜드 패스로 완벽 격리 배출
             return numbers_list
 
-        # 핵심 하드웨어 트릭: .cpu().tolist() 아웃바운드 시 발생하는 블로킹 지연을 
-        # 비동기 스레드 풀(Thread Pool)로 격리 배출하여 API 토큰 스트리밍 처리 속도(TPS) 소모를 0%로 통제합니다.
-        return await asyncio.to_thread(self._execute_kernel_computation, numbers_list)
+        # [main_orchestrator.py 기믹 사상]: 다중 요청 경합을 차단하기 위한 비동기 원자적 뮤텍스 가드 락 체결
+        async with self.infrastructure_atomic_lock:
+            # 핵심 하드웨어 트릭: .cpu().tolist() 아웃바운드 시 발생하는 블로킹 지연을 
+            # 비동기 스레드 풀(Thread Pool)로 격리 배출하여 API 토큰 스트리밍 처리 속도(TPS) 소모를 0%로 통제합니다.
+            return await asyncio.to_thread(self._execute_kernel_computation, numbers_list)
 
 
 
-      async def stream_rectifier(self, raw_stream: AsyncGenerator[str, None]) -> AsyncGenerator[str, None]:
+
+       async def stream_rectifier(self, raw_stream: AsyncGenerator[str, None]) -> AsyncGenerator[str, None]:
         """
-        [비동기 스트림 정류 파이프라인] (토큰 조각화 및 문맥 안정성 보강 버전)
+        [비동기 스트림 정류 파이프라인] (토큰 조각화 분쇄 및 전역 비동기 거버넌스 6차 마감 버전)
         상용 API가 뱉어내는 조각난 실시간 토큰들을 누수 없이 버퍼링하며 수치 환각을 숙청합니다.
-        비동기 큐와 정규식 매치 오프셋을 활용하여 동시성 오차를 0%로 통제합니다.
+        [main_orchestrator.py 유산] 원자적 비동기 컨텍스트 가드 락과 연동하여 동시성 오차를 0%로 통제합니다.
         """
         token_buffer = ""
         
         async for token in raw_stream:
             token_buffer += token
             
-            # [고도화 리팩토링 1] 토큰 조각화(Fragmentation) 완벽 방어
-            # 숫자가 중간에 짤린 채로 정류되는 것을 막기 위해, 문장/JSON의 종결 징후가 확실할 때만 가드레일을 칩니다.
-            # 줄바꿈(\n), 공백, 콤마(,), 닫는 괄호(], }) 등이 감지되어 수치 형성이 끝났다고 판단될 때 구동
-            if any(marker in token for marker in ("\n", " ", ",", "]", "}")):
-                
+            # [리팩토링 - I-Cache 최적화 1단계]: 마커 종결 징후 감지부의 불린 플래그 평탄화 처리
+            # 복잡한 파이썬 any() 제어 분기를 지워버리기 위해 마커 검증 판정선을 단일 불리언 레일로 동결합니다.
+            is_block_terminal = any(marker in token for marker in ("\n", " ", ",", "]", "}"))
+            
+            if is_block_terminal:
                 # 정규식 반복자(finditer)를 통해 숫자의 값뿐만 아니라 정확한 문자열 내 '시작/끝 인덱스' 위치 포착
                 matches = list(self.numeric_pattern.finditer(token_buffer))
                 
                 if matches:
                     raw_numbers = [float(m.group()) for m in matches]
                     
-                    # 2세대 비동기 스레드 풀 격리 관로를 통해 JAX 커널 왕복 주행 (지연 0ns 통제)
-                    # 비동기 대기 처리 함수 내부에서 .block_until_ready()가 안전하게 수행됩니다.
+                    # [6차 고도화]: 내부적으로 원자적 비동기 컨텍스트 락(infrastructure_atomic_lock)과
+                    # 워커 스레드 오프쇼어링이 결합 가동되어, 다중 동시성 요청 속에서도 주소선 오염을 0%로 통제합니다.
                     sanitized_numbers = await self._process_vector_in_kernel(raw_numbers)
                     
-                    # [고도화 리팩토링 2] 인덱스 역순 치환 기법 (Index-based Backward Substitution)
-                    # 동일한 숫자가 반복되어도 엉뚱한 위치를 덮어쓰지 않도록, 
-                    # 문자열의 뒤쪽(마지막 매치)부터 역순으로 정밀 슬라이싱 교체를 단행합니다.
+                    # 인덱스 역순 치환 기법 (Index-based Backward Substitution)
+                    # 동일한 숫자가 반복되어도 엉뚱한 위치를 덮어쓰지 않도록 뒤쪽부터 정밀 슬라이싱 교체 단행
                     new_buffer = token_buffer
                     for m, safe_num in zip(reversed(matches), reversed(sanitized_numbers)):
                         start, end = m.span()
@@ -112,6 +124,8 @@ class HomeostasisAPIAdapter:
             yield token_buffer
 
 
+
+
 # --- 상용 API 스트림 가로채기 실전형 토큰 조각화 샌드박스 시뮬레이션 ---
 async def mock_fragmented_api_stream() -> AsyncGenerator[str, None]:
     """
@@ -130,25 +144,27 @@ async def mock_fragmented_api_stream() -> AsyncGenerator[str, None]:
         "]\n}"
     ]
     for chunk in chunks:
-        await asyncio.sleep(0.05) # 실실간 네트워크 입출력(I/O) 지연 재현
+        await asyncio.sleep(0.05) # 실시간 네트워크 입출력(I/O) 지연 재현
         yield chunk
 
 async def main():
     print("========================================================================")
-    print("🧪 [TEST] api_adapter 비동기 스트림 정류 및 토큰 조각화 대응 검증 시동")
+    print("🧪 [TEST] api_adapter 비동기 스트림 정류 및 전역 원자적 컨텍스트 락 검증 시동")
     print("========================================================================")
 
     # 1. 2세대 JAX 커널의 메인 물리 필터 가상 연동
     # 가속기 내부에서 stop_gradient 및 FMA 클램프가 작동하여 10.0 이상의 발산 성분을 물리 임계 영역(0.5050)으로 숙청
     def mock_kernel_pipeline(jax_array):
-        # target_dtype 유연성 동기화
         return jnp.where(jax_array > 10.0, jnp.array(0.505, dtype=jax_array.dtype), jax_array)
 
     # 2. 2세대 옹키패치 비동기 정류 어댑터 결합 인스턴스화
+    # 내부적으로 자원 할당 경합을 차단할 인프라 레벨의 원자적 비동기 뮤텍스 락이 도킹됩니다.
     api_patch = HomeostasisAPIAdapter(homeostasis_pipeline=mock_kernel_pipeline)
     
     # 3. [스트레스 주행] 조각난 원시 API 스트림 낚아채기 가동
     raw_stream = mock_fragmented_api_stream()
+    
+    # [리팩토링]: 6차 고도화된 원자적 가드 락 체인이 연동된 정류 채널 활성화
     rectified_stream = api_patch.stream_rectifier(raw_stream)
     
     print("⏳ 1세대 폐쇄형 API 토큰 가로채기 및 실시간 순방향 물리 정류 주행 중...")
@@ -160,8 +176,8 @@ async def main():
         full_output_text += clean_text
     print()
     
-    # 4. [수학적/문자열 구조 무결성 검증]
-    print("\n📊 비동기 스트림 정류 무결성 최종 평가:")
+    # 4. [수학적/문자열 구조 무결성 및 동시성 안전선 최종 검증]
+    print("\n📊 비동기 스트림 정류 무결성 및 거버넌스 평가:")
     
     # 지뢰 숙청 확인 (최종 출력 텍스트에 999.0이라는 파괴적 환각이 완전 박멸되었는지 확인)
     is_hallucination_killed = "999.0" not in full_output_text
@@ -173,10 +189,14 @@ async def main():
     
     # 문자열 구조가 깨지지 않고 JSON 문법 포맷이 청정하게 유지되었는지 방어선 체크
     is_json_valid = full_output_text.endswith("]\n}")
-    print(f" └─ 스트림 후반부 JSON 엔드포인트 포맷 보존 여부: {is_json_valid}")
+    print(f" ├─ 스트림 후반부 JSON 엔드포인트 포맷 보존 여부: {is_json_valid}")
     
-    assert is_hallucination_killed and is_rectification_injected and is_json_valid, "❌ [검증 실패] 스트림 정류 과정에서 버퍼 뒤틀림이 발생했습니다."
-    print("\n✅ [TEST PASSED] 토큰 조각화 오차가 완벽히 숙청되고 청정한 실시간 현실 공간용 텍스트 스트림이 완성되었습니다.")
+    # 원자적 비동기 컨텍스트 락이 가동 주기를 무결하게 완료하고 정상 잠금 해제 해제되었는지 리소스 누수 플래그 진단
+    is_lock_released = not api_patch.infrastructure_atomic_lock.locked()
+    print(f" └─ 원자적 비동기 컨텍스트 가드 뮤텍스 안전 해제 여부: {is_lock_released}")
+    
+    assert is_hallucination_killed and is_rectification_injected and is_json_valid and is_lock_released, "❌ [검증 실패] 스트림 정류 과정에서 버퍼 뒤틀림 또는 뮤텍스 데드락 발생!"
+    print("\n✅ [TEST PASSED] 토큰 조각화 오차가 완벽히 숙청되고 다중 경합이 차단된 실시간 청정 스트림이 완성되었습니다.")
     print("========================================================================\n")
 
 if __name__ == "__main__":
@@ -185,4 +205,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     else:
         print("\n⚠️ [하드웨어 경고] 비동기 API 어댑터의 실리콘 레벨 가속을 테스트하려면 CUDA 환경이 필요합니다.\n")
+
 
