@@ -323,6 +323,8 @@ graph TD
 ```
 
 ---
+
+```text
 ====================================================================================================
 [ Acceleration Layer ]                [ Constituent Modules & Data Flow ]
 ====================================================================================================
@@ -353,6 +355,9 @@ graph TD
                  ├── test_memory_o1.py     ◄── [ Static O(1) VRAM Spatial Complexity Proof under Infinite Loops ]
                  └── test_robot_trajectory.py◄── [ Actuator Destruction Prevention via Schrödinger Potential Locks ]
 ====================================================================================================
+
+```
+---
 
 
 ## ⚓ Appendix. Core Physical Kernel Silicon Guideline Manifest (FNG V3)
