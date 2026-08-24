@@ -1,5 +1,8 @@
 # ⏳ Module for LLM Homeostasis (PoC)
 
+
+This module is designed based on the 2nd-Generation Homeostatic Kernel architecture, which controls the stochastic divergence of first-generation LLMs.
+
 ---
 
 ## 🌌 Sector 1. Introduction & Problem Definition
