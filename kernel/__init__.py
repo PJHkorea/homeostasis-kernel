@@ -6,11 +6,13 @@
 # Enforces permanent architectural freezing on the global API specifications exposed to 
 # downstream enterprise integration bridges and validation sandboxes into a unified pipeline.
 
-from kernel.physics_filter import PhysicsInformativeFilter
-from kernel.manifold import TopologicalManifoldTransformer
-from kernel.autograd_free import AutogradFreeIsolationLayer
-from kernel.async_scheduler import compile_asynchronous_overlapping_pipeline
-from kernel.elastic_governor import (
+# [Refactoring Note]: Relocated from absolute paths to explicit relative imports.
+# Purged all framework-dependent adapter hooks to enforce a pure, mathematical logic core.
+from .physics_filter import PhysicsInformativeFilter
+from .manifold import TopologicalManifoldTransformer
+from .autograd_free import AutogradFreeIsolationLayer
+from .async_scheduler import compile_asynchronous_overlapping_pipeline
+from .elastic_governor import (
     compute_dynamic_viscosity_sigmoid,
     compile_wireless_elastic_governor
 )
