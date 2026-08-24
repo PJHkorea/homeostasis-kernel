@@ -6,9 +6,11 @@
 # Enforces permanent architectural freezing on the global API entryways for external 
 # pre-transformer hot-plugging interlocks and real-time stream rectification conduits.
 
-from adapters.hf_adapter import HuggingFaceManifoldHooker
-from adapters.api_adapter import APIStreamParityRectifier
-from adapters.transformer_interlock import HomeostasisTransformerInterlockLayer
+# [Refactoring Note]: Relocated from absolute paths to explicit relative imports 
+# to enforce strict encapsulating governance inside the standalone adapters/ package boundary.
+from .hf_adapter import HuggingFaceManifoldHooker
+from .api_adapter import APIStreamParityRectifier
+from .transformer_interlock import HomeostasisTransformerInterlockLayer
 
 # Immutable namespace governance specification dedicated to the main infrastructure 
 # orchestrator and integrated sandbox validation profilers.
