@@ -1,27 +1,36 @@
 # ⏳ Homeostasis Kernel: 2nd-Generation Causal AI Engine (PoC)
 
-> "This research-oriented Proof of Concept (PoC) project explores the mathematical feasibility of a hardware-friendly homeostasis kernel. It enforces 'linear temporal continuity' strictly in the forward pass to mitigate the numerical phase jitter and macro-causality leakage often induced by the a posteriori convergence of backpropagation."
-
 ---
 
 ## 🌌 Sector 1. Introduction & Problem Definition
 
-### 🚨 Architectural Trade-offs of First-Generation Probabilistic Models
+Just as the human brain ensures the safety of final actions by real-time rectification—filtering the cerebral cortex's free abstract reasoning and probabilistic cognition through the thalamus and the brainstem's homeostatic mechanisms (GABAergic inhibition)—this architecture experimentally explores an approach to controlling the risk of statistical divergence inherent in first-generation LLMs by employing a "sandwiching" structure featuring a second-generation homeostatic kernel (PoC).
 
-Current state-of-the-art first-generation generative AI models, such as Transformer-based Large Language Models (LLMs), rely heavily on massive statistical correlations and probabilistic next-token prediction. While this computational architecture has proven highly effective for high-dimensional text synthesis and conceptual abstraction, it exhibits structural trade-offs and potential vulnerabilities when deployed in physical control environments governed by mathematical and physical continuity:
+```mermaid
+graph TD
+    %% [Left: Biological Neural Control Rail]
+    A1["🧠 Cerebral Cortex<br>(Abstract Reasoning / Probabilistic Cognition)"]
+    A2["⚡ Thalamus & Brainstem<br>(Real-Time Rectification<br>GABAergic Inhibition)"]
+    A3["💪 Final Actions"]
 
-* **Discretization of Temporal Causality:** Rather than perceiving the irreversible flow of time as continuous causal chains, these models spatialize time within a static context window. Consequently, preserving chronological antecedents and consequences algebraically remains a fundamental challenge.
-* **Numerical Jitter via Cumulative Tolerances:** In domains where the accumulation of micro-errors can lead to catastrophic system failure—such as computer-aided design (CAD), hardware physics simulation, and real-time robotics kinematics—probabilistic sampling is susceptible to producing discontinuous phase jumps (numerical hallucinations).
-* **VRAM Complexity Inflation via Context Expansion ($O(N^2)$):** As the input sequence and horizontal context expand, historical computation graphs and activation tensors must be accumulated quadratically within the accelerator memory. This rapidly encounters the hardware-level physical constraint known as the Memory Wall.
+    A1 --> A2
+    A2 --> A3
 
+    %% [Right: Computational Architecture Rail]
+    B1["🎲 1st-Gen LLM<br>(Statistical Divergence Risk / Probabilistic Output)"]
+    B2["⏳ 2nd-Gen Homeostatic Kernel<br>(Branchless FMA Physical Numerical Rectification)"]
+    B3["🎯 Final Token"]
 
-### ⏳ Alternative Hypothesis: Forward Equilibrating Control (Homeostasis Kernel)
+    B1 --> B2
+    B2 --> B3
 
-To mitigate the spatio-temporal and physical complexity inherent in conventional probabilistic architectures, `homeostasis-kernel` introduces an alternative, experimental execution layer. It selectively bypasses unconstrained statistical distribution sampling, instead enforcing real-time physical constraints (via PINN mechanisms) and geometric equilibrium states directly within the forward pass.
-
-This kernel explores an unconventional design space by systematically cutting off backpropagation pathways—which conventionally trace high-dimensional computation graphs and accumulate massive VRAM activation buffers—thereby adhering strictly to a **Forward-Only** paradigm. In lieu of backward updates, it induces a biological 'Homeostasis' mechanism within the lowest level of the accelerator runtime. This is achieved via custom CUDA register warp interlocks and JAX hardware-software co-design, which organically dissipate external perturbations and stochastic trajectory volatility to maintain a state of continuous stability.
-
-By driving a linear and continuous timeline, this work seeks to investigate the engineering feasibility of enforcing numerical integrity across distributed clusters using solely branchless, non-differentiable forward execution coupled with static manifold sharding at the silicon layer.
+    %% [Style and Color Theme Definitions]
+    classDef brain fill:#fff3e0,stroke:#e65100,stroke-width:1.5px,color:#000;
+    classDef kernel fill:#e1f5fe,stroke:#01579b,stroke-width:1.5px,color:#000;
+    
+    class A1,A2,A3 brain;
+    class B1,B2,B3 kernel;
+```
 
 ---
 
