@@ -204,7 +204,6 @@ When executing workloads across massive distributed clusters, accumulating fault
 homeostasis-kernel/
 │
 ├── README.md                 # Technical whitepaper analyzing first-generation causality leakage and detailing second-generation forward homeostatic design
-├── requirements.txt          # Core dependencies for distributed computing environments and cross-framework runtimes (JAX, PyTorch, CuPy, etc.)
 │
 ├── kernel/                   # [Main-Brain] 2nd-Gen Homeostatic Guardrail Forward Physical Filtering Engine (JAX Backend)
 │   ├── __init__.py
