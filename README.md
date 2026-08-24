@@ -1,4 +1,4 @@
-# ⏳ Second Module for LLM Homeostasis (PoC)
+# ⏳ Module for LLM Homeostasis (PoC)
 
 ---
 
