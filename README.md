@@ -1,4 +1,4 @@
-# ⏳ Homeostasis Kernel: 2nd-Generation Causal AI Engine (PoC)
+# ⏳ Second Module for LLM Homeostasis (PoC)
 
 ---
 
